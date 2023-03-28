@@ -6,3 +6,109 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+## Loading the libraries
+
+```{r}
+
+library(ggplot2)
+library(rpart)
+library(rpart.plot)
+library(tidyr)
+library(dplyr)
+
+```
+
+## Reading the data
+```{r}
+data <- read.csv("inventory.csv")
+
+# check the structure of the data
+str(data)
+
+# check summary statistics
+summary(data)
+
+```
+
+## Looking at the missing values
+
+```{r}
+sum(is.na("inventory.csv"))
+```
+
+There are no missing values in the data.
+
+## EDA
+
+```{r}
+## Looking at the unique products in the data
+
+unique_items <- unique(data$item_no)
+length(unique_items)
+
+```
+```{r}
+# Get a data frame of unique items and their total sales
+unique_sales <- aggregate(sold ~ item_no, data = data, FUN = sum)
+
+# Order the data frame by total sales and get the top 50 items
+top_50_items <- unique_sales[order(unique_sales$sold, decreasing = TRUE), ][1:50, ]
+
+# Print the resulting data frame
+print(top_50_items)
+
+
+```
+
+Item "A510004" has the highest number of sales i.e 75047
+
+```{r}
+# Create a new data frame with the count of weeks for each item which have 0 sales
+zero_sales <- data %>%
+  group_by(item_no) %>%
+  summarize(count = sum(sold == 0)) 
+zero_sales
+
+
+```
+
+```{r}
+# Aggregate the sales data by item
+sales_by_item <- aggregate(data$sold, by = list(data$item_no), sum)
+colnames(sales_by_item) <- c("item_no", "total_sales")
+
+# Plot the total sales for each item
+ggplot(sales_by_item, aes(x = item_no, y = total_sales)) + 
+  geom_bar(stat = "identity", fill = "steelblue") + 
+  labs(title = "Total Sales by Item", x = "Item Number", y = "Total Sales")
+
+```
+
+## Model preparation
+
+```{r}
+# Split the data into a training set and a test set
+set.seed(123)
+train_index <- sample(1:nrow(data), size = 0.7 * nrow(data))
+train_df <- data[train_index, ]
+test_df <- data[-train_index, ]
+
+# Fit each model on the training set
+models <- lapply(unique(train_df$item_no), function(item) {
+  # Subset the training set for the current item
+  item_train <- subset(train_df, item_no == item)
+  
+  # Create a GLM model with a Poisson distribution
+  model <- glm(sold ~ week, data = item_train, family = poisson)
+  
+  # Return the model
+  return(model)
+})
+```
+
+
+
+
+
+
